@@ -1,67 +1,62 @@
 package main
 
 import (
-	"html/template"
+	"context"
 	"log"
 	"net/http"
+	"os"
 	"sync/atomic"
+
+	"github.com/chtozamm/chirpy/internal/database"
+	"github.com/jackc/pgx/v5"
+	"github.com/joho/godotenv"
 )
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
-}
-
-func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cfg.fileserverHits.Add(1)
-		next.ServeHTTP(w, r)
-	})
+	db             *database.Queries
 }
 
 func main() {
-	apiCfg := apiConfig{atomic.Int32{}}
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	dbURL := os.Getenv("DB_URL")
+
+	conn, err := pgx.Connect(context.Background(), dbURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close(context.Background())
+
+	dbQueries := database.New(conn)
+
+	const filepathRoot = "."
+	const port = "8080"
+
+	apiCfg := apiConfig{
+		fileserverHits: atomic.Int32{},
+		db:             dbQueries,
+	}
 
 	mux := http.NewServeMux()
+	fsHandler := apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))
+	mux.Handle("/app/", fsHandler)
 
-	server := http.Server{
-		Addr:    ":8080",
+	mux.HandleFunc("GET /api/healthz", handlerReadiness)
+	mux.HandleFunc("POST /api/users", apiCfg.handleCreateUser)
+	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
+
+	mux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
+	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
+
+	srv := &http.Server{
+		Addr:    ":" + port,
 		Handler: mux,
 	}
 
-	// mux.Handle("/app/", http.StripPrefix("/app/", http.FileServer(http.Dir("."))))
-	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir(".")))))
-	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Write([]byte("OK"))
-	})
-	// mux.HandleFunc("GET /api/metrics", func(w http.ResponseWriter, r *http.Request) {
-	// 	hits := apiCfg.fileserverHits.Load()
-	// 	w.Write([]byte(fmt.Sprintf("Hits: %d", hits)))
-	// })
-	mux.HandleFunc("GET /admin/metrics", func(w http.ResponseWriter, r *http.Request) {
-		t, err := template.New("").Parse(`<html>
-  <body>
-    <h1>Welcome, Chirpy Admin</h1>
-    <p>Chirpy has been visited {{.}} times!</p>
-  </body>
-</html>`)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-
-		hits := apiCfg.fileserverHits.Load()
-
-		w.Header().Set("Content-Type", "text/html")
-		t.Execute(w, hits)
-		// w.Write([]byte(fmt.Sprintf("Hits: %d", hits)))
-	})
-	mux.HandleFunc("POST /admin/reset", func(w http.ResponseWriter, r *http.Request) {
-		apiCfg.fileserverHits.Store(0)
-		// w.WriteHeader(http.StatusOK)
-	})
-
-	log.Fatal(server.ListenAndServe())
+	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
+	log.Fatal(srv.ListenAndServe())
 }
-
