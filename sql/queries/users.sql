@@ -7,3 +7,7 @@ VALUES (
 	$1
 )
 RETURNING *;
+
+-- name: RemoveAllUsers :exec
+TRUNCATE TABLE users;
+
