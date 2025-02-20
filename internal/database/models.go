@@ -8,9 +8,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Chirp struct {
+	ID        pgtype.UUID      `json:"id"`
+	CreatedAt pgtype.Timestamp `json:"created_at"`
+	UpdatedAt pgtype.Timestamp `json:"updated_at"`
+	Body      string           `json:"body"`
+	UserID    pgtype.UUID      `json:"user_id"`
+}
+
 type User struct {
-	ID        pgtype.UUID
-	CreatedAt pgtype.Timestamp
-	UpdatedAt pgtype.Timestamp
-	Email     string
+	ID        pgtype.UUID      `json:"id"`
+	CreatedAt pgtype.Timestamp `json:"created_at"`
+	UpdatedAt pgtype.Timestamp `json:"updated_at"`
+	Email     string           `json:"email"`
 }
