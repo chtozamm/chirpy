@@ -64,3 +64,23 @@ func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusCreated)
 	w.Write(resp)
 }
+
+func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	chirps, err := cfg.db.GetChirps(context.Background())
+	if err != nil {
+		log.Printf("Error getting chirps from db: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	resp, err := json.Marshal(chirps)
+	if err != nil {
+		log.Printf("Error marshalling chirps struct: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(resp)
+}
