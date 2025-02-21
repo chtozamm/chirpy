@@ -84,3 +84,35 @@ func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 
 	w.Write(resp)
 }
+
+func (cfg *apiConfig) handleGetChirp(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	pgUUID := pgtype.UUID{}
+	err := pgUUID.Scan(r.PathValue("chirpID"))
+	if err != nil {
+		log.Printf("Error scanning chirpID from request path into pgtype.UUID: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if !pgUUID.Valid {
+		http.Error(w, "invalid chirp id", http.StatusBadRequest)
+		return
+	}
+
+	chirps, err := cfg.db.GetChirp(context.Background(), pgUUID)
+	if err != nil {
+		log.Printf("Error getting chirp from db: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	resp, err := json.Marshal(chirps)
+	if err != nil {
+		log.Printf("Error marshalling chirp struct: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(resp)
+}
