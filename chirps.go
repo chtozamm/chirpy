@@ -8,22 +8,34 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/chtozamm/chirpy/internal/auth"
 	"github.com/chtozamm/chirpy/internal/database"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.authSecret)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
 	type parameters struct {
-		Body   string `json:"body"`
-		UserID string `json:"user_id"`
+		Body string `json:"body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		log.Printf("Error decoding parameters: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -32,34 +44,30 @@ func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if params.UserID == "" {
-		http.Error(w, "user_id cannot be empty", http.StatusBadRequest)
-		return
-	}
-
 	pgUUID := pgtype.UUID{}
-	err = pgUUID.Scan(params.UserID)
+	err = pgUUID.Scan(userID.String())
 	if err != nil {
 		log.Printf("Error scanning user_id from request into pgtype.UUID: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	if !pgUUID.Valid {
-		http.Error(w, "invalid user_id", http.StatusBadRequest)
+		log.Printf("Failed to validate pgUUID: %v is invalid\n", pgUUID.String())
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	newChirp, err := cfg.db.CreateChirp(context.Background(), database.CreateChirpParams{Body: params.Body, UserID: pgUUID})
 	if err != nil {
 		log.Printf("Error creating a chirp: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	resp, err := json.Marshal(newChirp)
 	if err != nil {
 		log.Printf("Error marshalling chirp struct: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -73,14 +81,14 @@ func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 	chirps, err := cfg.db.GetChirps(context.Background())
 	if err != nil {
 		log.Printf("Error getting chirps from db: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	resp, err := json.Marshal(chirps)
 	if err != nil {
 		log.Printf("Error marshalling chirps struct: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -93,25 +101,25 @@ func (cfg *apiConfig) handleGetChirp(w http.ResponseWriter, r *http.Request) {
 	pgUUID := pgtype.UUID{}
 	err := pgUUID.Scan(r.PathValue("chirpID"))
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
 	}
 
 	chirps, err := cfg.db.GetChirp(context.Background(), pgUUID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			w.WriteHeader(http.StatusNotFound)
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 			return
 		}
 		log.Printf("Error getting chirp from db: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	resp, err := json.Marshal(chirps)
 	if err != nil {
 		log.Printf("Error marshalling chirp struct: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 

@@ -16,6 +16,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
 	platform       string
+	authSecret     string
 }
 
 func main() {
@@ -26,6 +27,7 @@ func main() {
 
 	dbURL := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM")
+	authSecret := os.Getenv("AUTH_SECRET")
 
 	conn, err := pgx.Connect(context.Background(), dbURL)
 	if err != nil {
@@ -42,6 +44,7 @@ func main() {
 		fileserverHits: atomic.Int32{},
 		db:             dbQueries,
 		platform:       platform,
+		authSecret:     authSecret,
 	}
 
 	mux := http.NewServeMux()

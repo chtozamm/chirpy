@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/chtozamm/chirpy/internal/auth"
 	"github.com/chtozamm/chirpy/internal/database"
@@ -25,7 +26,7 @@ func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	err := decoder.Decode(&params)
 	if err != nil {
 		log.Printf("Error decoding parameters: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -53,14 +54,14 @@ func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Printf("Error creating a user: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	resp, err := json.Marshal(newUser)
 	if err != nil {
 		log.Printf("Error marshalling user struct: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -70,8 +71,9 @@ func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) handleAuthenticateUser(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email            string `json:"email"`
+		Password         string `json:"password"`
+		ExpiresInSeconds int    `json:"expires_in_seconds"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -79,7 +81,7 @@ func (cfg *apiConfig) handleAuthenticateUser(w http.ResponseWriter, r *http.Requ
 	err := decoder.Decode(&params)
 	if err != nil {
 		log.Printf("Error decoding parameters: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -96,11 +98,11 @@ func (cfg *apiConfig) handleAuthenticateUser(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-			http.Error(w, "email already exists", http.StatusConflict)
+			http.Error(w, "Email already exists", http.StatusConflict)
 			return
 		}
 		log.Printf("Error creating a user: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -110,11 +112,26 @@ func (cfg *apiConfig) handleAuthenticateUser(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	var expires time.Duration
+	if params.ExpiresInSeconds > 3600 || params.ExpiresInSeconds == 0 {
+		expires = time.Hour
+	} else {
+		expires = time.Second * time.Duration(params.ExpiresInSeconds)
+	}
+
+	token, err := auth.MakeJWT(user.ID.Bytes, cfg.authSecret, expires)
+	if err != nil {
+		log.Printf("Failed to make JWT: %v\n", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
 	type userResponse struct {
 		ID        pgtype.UUID      `json:"id"`
 		CreatedAt pgtype.Timestamp `json:"created_at"`
 		UpdatedAt pgtype.Timestamp `json:"updated_at"`
 		Email     string           `json:"email"`
+		Token     string           `json:"token"`
 	}
 
 	userResp := userResponse{
@@ -122,12 +139,13 @@ func (cfg *apiConfig) handleAuthenticateUser(w http.ResponseWriter, r *http.Requ
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
 		Email:     user.Email,
+		Token:     token,
 	}
 
 	resp, err := json.Marshal(userResp)
 	if err != nil {
 		log.Printf("Error marshalling user struct: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
