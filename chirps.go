@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 
@@ -91,17 +93,16 @@ func (cfg *apiConfig) handleGetChirp(w http.ResponseWriter, r *http.Request) {
 	pgUUID := pgtype.UUID{}
 	err := pgUUID.Scan(r.PathValue("chirpID"))
 	if err != nil {
-		log.Printf("Error scanning chirpID from request path into pgtype.UUID: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	if !pgUUID.Valid {
-		http.Error(w, "invalid chirp id", http.StatusBadRequest)
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	chirps, err := cfg.db.GetChirp(context.Background(), pgUUID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 		log.Printf("Error getting chirp from db: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return

@@ -17,8 +17,9 @@ type Chirp struct {
 }
 
 type User struct {
-	ID        pgtype.UUID      `json:"id"`
-	CreatedAt pgtype.Timestamp `json:"created_at"`
-	UpdatedAt pgtype.Timestamp `json:"updated_at"`
-	Email     string           `json:"email"`
+	ID             pgtype.UUID      `json:"id"`
+	CreatedAt      pgtype.Timestamp `json:"created_at"`
+	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
+	Email          string           `json:"email"`
+	HashedPassword string           `json:"hashed_password"`
 }

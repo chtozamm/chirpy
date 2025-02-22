@@ -8,7 +8,7 @@ import (
 func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf(`
+	fmt.Fprintf(w, `
 <html>
 
 <body>
@@ -17,7 +17,7 @@ func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
 </body>
 
 </html>
-	`, cfg.fileserverHits.Load())))
+	`, cfg.fileserverHits.Load())
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
