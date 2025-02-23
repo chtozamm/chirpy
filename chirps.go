@@ -125,3 +125,55 @@ func (cfg *apiConfig) handleGetChirp(w http.ResponseWriter, r *http.Request) {
 
 	w.Write(resp)
 }
+
+func (cfg *apiConfig) handleDeleteChirp(w http.ResponseWriter, r *http.Request) {
+	// Validate access token
+	accessToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		http.Error(w, "Access token is missing or invalid in the Authorization header", http.StatusUnauthorized)
+		return
+	}
+
+	id, err := auth.ValidateJWT(accessToken, cfg.authSecret)
+	if err != nil {
+		http.Error(w, "Invalid access token", http.StatusUnauthorized)
+		return
+	}
+
+	userID := pgtype.UUID{}
+	userID.Scan(id.String())
+
+	// Parse chirp ID from the path
+	pgUUID := pgtype.UUID{}
+	err = pgUUID.Scan(r.PathValue("chirpID"))
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	}
+
+	// Get chirp from database to compare user IDs
+	chirp, err := cfg.db.GetChirp(context.Background(), pgUUID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
+		log.Printf("Error deleting chirp from db: %v\n", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	if chirp.UserID != userID {
+		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+	}
+
+	// Remove chirp from database
+	err = cfg.db.DeleteChirp(context.Background(), pgUUID)
+	if err != nil {
+		log.Printf("Error deleting chirp from db: %v\n", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
