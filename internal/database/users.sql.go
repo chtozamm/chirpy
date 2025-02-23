@@ -57,7 +57,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const removeAllUsers = `-- name: RemoveAllUsers :exec
-TRUNCATE TABLE users
+DELETE FROM users
 `
 
 func (q *Queries) RemoveAllUsers(ctx context.Context) error {

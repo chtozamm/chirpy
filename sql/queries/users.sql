@@ -10,7 +10,7 @@ VALUES (
 RETURNING *;
 
 -- name: RemoveAllUsers :exec
-TRUNCATE TABLE users;
+DELETE FROM users;
 
 -- name: GetUserByEmail :one
 SELECT * FROM users WHERE email = $1;
