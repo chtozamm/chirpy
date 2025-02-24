@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"slices"
 
 	"github.com/chtozamm/chirpy/internal/auth"
 	"github.com/chtozamm/chirpy/internal/database"
@@ -77,6 +78,7 @@ func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter, r *http.Request) 
 
 func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 	authorID := r.URL.Query().Get("author_id")
+	sortOrder := r.URL.Query().Get("sort")
 
 	var chirps []database.Chirp
 	var err error
@@ -98,6 +100,12 @@ func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
+	}
+
+	if sortOrder == "desc" {
+		slices.SortFunc(chirps, func(a, b database.Chirp) int {
+			return b.CreatedAt.Time.Compare(a.CreatedAt.Time)
+		})
 	}
 
 	resp, err := json.Marshal(chirps)
