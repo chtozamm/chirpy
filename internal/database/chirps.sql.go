@@ -97,6 +97,36 @@ func (q *Queries) GetChirps(ctx context.Context) ([]Chirp, error) {
 	return items, nil
 }
 
+const getChirpsFromAuthor = `-- name: GetChirpsFromAuthor :many
+SELECT id, created_at, updated_at, body, user_id FROM chirps WHERE user_id = $1 ORDER BY created_at ASC
+`
+
+func (q *Queries) GetChirpsFromAuthor(ctx context.Context, userID pgtype.UUID) ([]Chirp, error) {
+	rows, err := q.db.Query(ctx, getChirpsFromAuthor, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Chirp
+	for rows.Next() {
+		var i Chirp
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Body,
+			&i.UserID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const removeAllChirps = `-- name: RemoveAllChirps :exec
 DELETE FROM chirps
 `

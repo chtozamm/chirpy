@@ -76,13 +76,28 @@ func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter, r *http.Request) 
 }
 
 func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
+	authorID := r.URL.Query().Get("author_id")
 
-	chirps, err := cfg.db.GetChirps(context.Background())
-	if err != nil {
-		log.Printf("Error getting chirps from db: %v\n", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
+	var chirps []database.Chirp
+	var err error
+
+	if authorID != "" {
+		authorUUID := pgtype.UUID{}
+		authorUUID.Scan(authorID)
+
+		chirps, err = cfg.db.GetChirpsFromAuthor(context.Background(), authorUUID)
+		if err != nil {
+			log.Printf("Error getting chirps from db: %v\n", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+	} else {
+		chirps, err = cfg.db.GetChirps(context.Background())
+		if err != nil {
+			log.Printf("Error getting chirps from db: %v\n", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	resp, err := json.Marshal(chirps)
