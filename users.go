@@ -60,17 +60,19 @@ func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type response struct {
-		ID        pgtype.UUID      `json:"id"`
-		CreatedAt pgtype.Timestamp `json:"created_at"`
-		UpdatedAt pgtype.Timestamp `json:"updated_at"`
-		Email     string           `json:"email"`
+		ID          pgtype.UUID      `json:"id"`
+		CreatedAt   pgtype.Timestamp `json:"created_at"`
+		UpdatedAt   pgtype.Timestamp `json:"updated_at"`
+		Email       string           `json:"email"`
+		IsChirpyRed bool             `json:"is_chirpy_red"`
 	}
 
 	resp, err := json.Marshal(response{
-		ID:        newUser.ID,
-		CreatedAt: newUser.CreatedAt,
-		UpdatedAt: newUser.UpdatedAt,
-		Email:     newUser.Email,
+		ID:          newUser.ID,
+		CreatedAt:   newUser.CreatedAt,
+		UpdatedAt:   newUser.UpdatedAt,
+		Email:       newUser.Email,
+		IsChirpyRed: newUser.IsChirpyRed,
 	})
 	if err != nil {
 		log.Printf("Error marshalling response struct: %v\n", err)
@@ -136,6 +138,7 @@ func (cfg *apiConfig) handleAuthenticateUser(w http.ResponseWriter, r *http.Requ
 		CreatedAt    pgtype.Timestamp `json:"created_at"`
 		UpdatedAt    pgtype.Timestamp `json:"updated_at"`
 		Email        string           `json:"email"`
+		IsChirpyRed  bool             `json:"is_chirpy_red"`
 		Token        string           `json:"token"`
 		RefreshToken string           `json:"refresh_token"`
 	}
@@ -162,6 +165,7 @@ func (cfg *apiConfig) handleAuthenticateUser(w http.ResponseWriter, r *http.Requ
 		CreatedAt:    user.CreatedAt,
 		UpdatedAt:    user.UpdatedAt,
 		Email:        user.Email,
+		IsChirpyRed:  user.IsChirpyRed,
 		Token:        token,
 		RefreshToken: refreshToken,
 	}
@@ -173,7 +177,6 @@ func (cfg *apiConfig) handleAuthenticateUser(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
 	w.Write(resp)
 }
 

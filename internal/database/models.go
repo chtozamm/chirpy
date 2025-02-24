@@ -31,4 +31,5 @@ type User struct {
 	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
 	Email          string           `json:"email"`
 	HashedPassword string           `json:"hashed_password"`
+	IsChirpyRed    bool             `json:"is_chirpy_red"`
 }
