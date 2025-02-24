@@ -7,11 +7,18 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/chtozamm/chirpy/internal/auth"
 	"github.com/chtozamm/chirpy/internal/database"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func (cfg *apiConfig) handleUpgradeUser(w http.ResponseWriter, r *http.Request) {
+	apiKey, err := auth.GetAPIKey(r.Header)
+	if err != nil || apiKey != cfg.polkaKey {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
 	type parameters struct {
 		Event string `json:"event"`
 		Data  struct {
