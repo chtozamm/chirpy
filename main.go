@@ -15,6 +15,7 @@ import (
 type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
+	filepathRoot   string
 	platform       string
 	authSecret     string
 	polkaKey       string
@@ -39,7 +40,7 @@ func main() {
 
 	dbQueries := database.New(conn)
 
-	const filepathRoot = "."
+	const filepathRoot = "./static"
 	const port = "8080"
 
 	apiCfg := apiConfig{
@@ -48,29 +49,10 @@ func main() {
 		platform:       platform,
 		authSecret:     authSecret,
 		polkaKey:       polkaKey,
+		filepathRoot:   filepathRoot,
 	}
 
-	mux := http.NewServeMux()
-	fsHandler := apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))
-	mux.Handle("/app/", fsHandler)
-
-	mux.HandleFunc("GET /api/chirps", apiCfg.handleGetChirps)
-	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handleGetChirp)
-	mux.HandleFunc("POST /api/chirps", apiCfg.handleCreateChirp)
-	mux.HandleFunc("POST /api/polka/webhooks", apiCfg.handleUpgradeUser)
-	mux.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.handleDeleteChirp)
-	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
-
-	mux.HandleFunc("POST /api/users", apiCfg.handleCreateUser)
-	mux.HandleFunc("PUT /api/users", apiCfg.handleUpdateUser)
-	mux.HandleFunc("POST /api/login", apiCfg.handleAuthenticateUser)
-	mux.HandleFunc("POST /api/refresh", apiCfg.handleRefreshToken)
-	mux.HandleFunc("POST /api/revoke", apiCfg.handleRevokeRefreshToken)
-
-	mux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
-	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
-
-	mux.HandleFunc("GET /api/healthz", handlerReadiness)
+	mux := getRouter(&apiCfg)
 
 	srv := &http.Server{
 		Addr:    ":" + port,
